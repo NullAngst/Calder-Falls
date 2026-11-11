@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-# Build the Calder Falls jukebox as a Linux AppImage.
+# Build Calder Falls as Linux AppImages.
 #
-#   bash build/build-appimage.sh
+#   bash build/build-appimage.sh            # both
+#   bash build/build-appimage.sh game       # dist/Calder-Falls-x86_64.AppImage
+#   bash build/build-appimage.sh jukebox    # dist/Calder-Falls-Jukebox-x86_64.AppImage
 #
-# Needs the Python deps from requirements.txt plus pyinstaller, and the
-# system libraries libfluidsynth3 and libportaudio2 (both get bundled).
-# Writes dist/Calder-Falls-Jukebox-x86_64.AppImage.
+# Needs the Python deps from requirements.txt plus pyinstaller, the system
+# libraries libfluidsynth3 and libportaudio2 (both get bundled), and for the
+# game a compiled story: story/build/main.json (python3 -m calder_falls.storytest
+# builds it with inklecate).
 #
-# This script targets glibc Linux (GitHub's Ubuntu runner). It finds the
-# two libraries with ldconfig -p, which is glibc-only. Set LIBFLUIDSYNTH and
+# This script targets glibc Linux (GitHub's Ubuntu runner). It finds the two
+# libraries with ldconfig -p, which is glibc-only. Set LIBFLUIDSYNTH and
 # LIBPORTAUDIO to full paths to skip that.
 
 set -euo pipefail
@@ -17,6 +20,15 @@ export LC_ALL=C
 here=$(cd -- "$(dirname -- "$0")" && pwd -P) || exit 1
 root=$(dirname -- "$here")
 cd -- "$root" || exit 1
+
+which_apps=${1:-both}
+case "$which_apps" in
+    both | game | jukebox) ;;
+    *)
+        printf 'build-appimage: unknown target %s (use game, jukebox or both)\n' "$which_apps" >&2
+        exit 1
+        ;;
+esac
 
 missing=""
 for cmd in python3 pyinstaller curl find awk; do
@@ -30,8 +42,6 @@ if [ -n "$missing" ]; then
     exit 1
 fi
 
-app=calder-falls-jukebox
-out_name=Calder-Falls-Jukebox-x86_64.AppImage
 version=$(python3 -c 'import calder_falls; print(calder_falls.__version__)')
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/calder-appimage.XXXXXX")
@@ -67,31 +77,12 @@ for f in soundfonts/Calder.sf2 assets/icon/calder-falls-256.png; do
         exit 1
     fi
 done
+if [ "$which_apps" != jukebox ] && [ ! -f story/build/main.json ]; then
+    printf 'build-appimage: story/build/main.json is missing, run python3 -m calder_falls.storytest first\n' >&2
+    exit 1
+fi
 
-printf '== PyInstaller\n'
-pyinstaller --noconfirm --clean --onedir --log-level WARN \
-    --name "$app" \
-    --distpath "$work/dist" --workpath "$work/build" --specpath "$work" \
-    --paths "$root" \
-    --add-binary "$fluid:." \
-    --add-binary "$porta:." \
-    --add-data "$root/music/cues:music/cues" \
-    --add-data "$root/soundfonts/Calder.sf2:soundfonts" \
-    --add-data "$bank:soundfonts" \
-    --add-data "$root/soundfonts/LICENSE-FluidR3Mono.txt:soundfonts" \
-    --add-data "$root/assets/icon:assets/icon" \
-    --exclude-module tkinter --exclude-module matplotlib --exclude-module soundfile \
-    --exclude-module pkg_resources --exclude-module setuptools \
-    "$root/build/jukebox-entry.py"
-
-bundle="$work/dist/$app"
-
-printf '== Dropping libraries the host must provide\n'
-# The AppImage project's excludelist names libraries that break when bundled
-# (libasound has to match the host's ALSA plugins, libGL the host driver).
-# Two exceptions: libfluidsynth links libjack and libpipewire directly, and
-# fails to load without them. We never use FluidSynth's own audio drivers,
-# so bundled copies of those two are never asked to talk to a server.
+printf '== Fetching the AppImage tools\n'
 excl="$work/excludelist"
 if ! curl -fsSL -o "$excl" https://raw.githubusercontent.com/AppImageCommunity/pkg2appimage/master/excludelist; then
     printf 'build-appimage: could not fetch the excludelist, using a short built-in one\n' >&2
@@ -100,50 +91,102 @@ if ! curl -fsSL -o "$excl" https://raw.githubusercontent.com/AppImageCommunity/p
         libX11.so.6 libxcb.so.1 libwayland-client.so.0 libc.so.6 libm.so.6 \
         libdl.so.2 libpthread.so.0 librt.so.1 libz.so.1 >"$excl"
 fi
-while IFS= read -r line; do
-    name=${line%%#*}
-    name=$(printf '%s' "$name" | awk '{ print $1 }')
-    case "$name" in
-        "" | libjack.so.0 | libpipewire-0.3.so.0) continue ;;
-    esac
-    find "$bundle" -name "$name" -exec rm -f -- {} +
-done <"$excl"
-
-printf '== AppDir\n'
-appdir="$work/AppDir"
-mkdir -p "$appdir/usr/lib" "$appdir/usr/share/applications" \
-    "$appdir/usr/share/icons/hicolor/256x256/apps"
-mv -- "$bundle" "$appdir/usr/lib/$app"
-
-cat >"$appdir/AppRun" <<'EOF'
-#!/bin/sh
-here=${APPDIR:-$(cd -- "$(dirname -- "$0")" && pwd -P)}
-exec "$here/usr/lib/calder-falls-jukebox/calder-falls-jukebox" "$@"
-EOF
-chmod +x -- "$appdir/AppRun"
-
-cat >"$appdir/$app.desktop" <<EOF
-[Desktop Entry]
-Type=Application
-Name=Calder Falls Jukebox
-Comment=Listen to and shape every Calder Falls music cue
-Exec=$app
-Icon=$app
-Categories=AudioVideo;Audio;
-Terminal=false
-X-AppImage-Version=$version
-EOF
-cp -- "$appdir/$app.desktop" "$appdir/usr/share/applications/"
-cp -- assets/icon/calder-falls-256.png "$appdir/$app.png"
-cp -- assets/icon/calder-falls-256.png "$appdir/.DirIcon"
-cp -- assets/icon/calder-falls-256.png "$appdir/usr/share/icons/hicolor/256x256/apps/$app.png"
-
-printf '== appimagetool\n'
 tool="$work/appimagetool"
 curl -fsSL -o "$tool" https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
 chmod +x -- "$tool"
 mkdir -p dist
-# No FUSE on CI runners, so appimagetool unpacks itself instead of mounting
-ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$tool" --no-appstream "$appdir" "dist/$out_name"
 
-printf '\nbuilt dist/%s\n' "$out_name"
+# build_one <exe name> <entry script> <AppImage file> <menu name> <comment> <extra pyinstaller args...>
+build_one() {
+    local app=$1 entry=$2 out_name=$3 label=$4 comment=$5
+    shift 5
+    local bundle="$work/dist/$app"
+    local appdir="$work/AppDir-$app"
+
+    printf '== PyInstaller: %s\n' "$app"
+    pyinstaller --noconfirm --clean --onedir --log-level WARN \
+        --name "$app" \
+        --distpath "$work/dist" --workpath "$work/build-$app" --specpath "$work" \
+        --paths "$root" \
+        --add-binary "$fluid:." \
+        --add-binary "$porta:." \
+        --add-data "$root/music/cues:music/cues" \
+        --add-data "$root/soundfonts/Calder.sf2:soundfonts" \
+        --add-data "$bank:soundfonts" \
+        --add-data "$root/soundfonts/LICENSE-FluidR3Mono.txt:soundfonts" \
+        --add-data "$root/assets/icon:assets/icon" \
+        --exclude-module tkinter --exclude-module matplotlib --exclude-module soundfile \
+        --exclude-module pkg_resources --exclude-module setuptools \
+        "$@" \
+        "$root/build/$entry"
+
+    printf '== Dropping libraries the host must provide\n'
+    # The AppImage project's excludelist names libraries that break when
+    # bundled (libasound has to match the host's ALSA plugins, libGL the
+    # host driver). Two exceptions: libfluidsynth links libjack and
+    # libpipewire directly and fails to load without them. We never use
+    # FluidSynth's own audio drivers, so bundled copies of those two are
+    # never asked to talk to a server.
+    local line name
+    while IFS= read -r line; do
+        name=${line%%#*}
+        name=$(printf '%s' "$name" | awk '{ print $1 }')
+        case "$name" in
+            "" | libjack.so.0 | libpipewire-0.3.so.0) continue ;;
+        esac
+        find "$bundle" -name "$name" -exec rm -f -- {} +
+    done <"$excl"
+
+    printf '== AppDir: %s\n' "$app"
+    mkdir -p "$appdir/usr/lib" "$appdir/usr/share/applications" \
+        "$appdir/usr/share/icons/hicolor/256x256/apps"
+    mv -- "$bundle" "$appdir/usr/lib/$app"
+
+    # One app per AppDir, so AppRun just runs the one executable under usr/lib
+    cat >"$appdir/AppRun" <<'EOF'
+#!/bin/sh
+here=${APPDIR:-$(cd -- "$(dirname -- "$0")" && pwd -P)}
+for exe in "$here"/usr/lib/*/calder-falls*; do
+    if [ -f "$exe" ] && [ -x "$exe" ]; then
+        exec "$exe" "$@"
+    fi
+done
+printf 'AppRun: no executable found under %s/usr/lib\n' "$here" >&2
+exit 1
+EOF
+    chmod +x -- "$appdir/AppRun"
+
+    {
+        printf '[Desktop Entry]\n'
+        printf 'Type=Application\n'
+        printf 'Name=%s\n' "$label"
+        printf 'Comment=%s\n' "$comment"
+        printf 'Exec=%s\n' "$app"
+        printf 'Icon=%s\n' "$app"
+        printf 'Categories=Game;AdventureGame;\n'
+        printf 'Terminal=false\n'
+        printf 'X-AppImage-Version=%s\n' "$version"
+    } >"$appdir/$app.desktop"
+    cp -- "$appdir/$app.desktop" "$appdir/usr/share/applications/"
+    cp -- assets/icon/calder-falls-256.png "$appdir/$app.png"
+    cp -- assets/icon/calder-falls-256.png "$appdir/.DirIcon"
+    cp -- assets/icon/calder-falls-256.png "$appdir/usr/share/icons/hicolor/256x256/apps/$app.png"
+
+    printf '== appimagetool: %s\n' "$out_name"
+    # No FUSE on CI runners, so appimagetool unpacks itself instead of mounting
+    ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$tool" --no-appstream "$appdir" "dist/$out_name"
+    printf 'built dist/%s\n' "$out_name"
+}
+
+if [ "$which_apps" != jukebox ]; then
+    build_one calder-falls game-entry.py Calder-Falls-x86_64.AppImage \
+        "Calder Falls" "A text-based psychological horror game" \
+        --collect-all bink \
+        --add-data "$root/story/build/main.json:story/build" \
+        --add-data "$root/fonts:fonts" \
+        --add-data "$root/calder_falls/themes/midnight.qss:calder_falls/themes"
+fi
+if [ "$which_apps" != game ]; then
+    build_one calder-falls-jukebox jukebox-entry.py Calder-Falls-Jukebox-x86_64.AppImage \
+        "Calder Falls Jukebox" "Listen to and shape every Calder Falls music cue"
+fi

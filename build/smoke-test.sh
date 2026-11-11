@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
-# Headless checks for Calder Falls, step 1 (music).
+# Headless checks for Calder Falls.
 #
 #   bash build/smoke-test.sh
 #
 # 1. The committed MIDI cues match what music/generate.py writes now (warning only).
 # 2. soundfonts/build_calder.py still builds a bank.
 # 3. Every cue plays through FluidSynth, and every control changes it.
-# 4. The jukebox opens with no display and walks every cue and control.
-# 5. If an AppImage path is given, that AppImage runs its own selftest too:
-#      bash build/smoke-test.sh dist/Calder-Falls-Jukebox-x86_64.AppImage
+# 4. The story compiles with zero inklecate warnings, every tag is known,
+#    and scripted routes reach all five endings.
+# 5. The game window opens with no display, plays the Prologue with sound,
+#    and toggles every setting. The jukebox does the same for its controls.
+# 6. Any AppImage paths given run their own selftest too:
+#      bash build/smoke-test.sh dist/Calder-Falls-x86_64.AppImage dist/Calder-Falls-Jukebox-x86_64.AppImage
+#
+# Needs inklecate: build/tools/inklecate, on PATH, or $INKLECATE.
 
 set -euo pipefail
 export LC_ALL=C
@@ -69,21 +74,35 @@ if ! python3 -m calder_falls.audio.smoke 2>"$work/smoke.err"; then
     fail=1
 fi
 
+printf '== story checks\n'
+if ! python3 -m calder_falls.storytest; then
+    fail=1
+fi
+
+# Settings, saves and the profile go to a throwaway folder, not your real ones
+export XDG_DATA_HOME="$work/xdg"
+
+printf '== game window selftest\n'
+if ! QT_QPA_PLATFORM=offscreen python3 -m calder_falls --selftest 2>"$work/game.err"; then
+    grep -v '^fluidsynth: warning' "$work/game.err" >&2 || true
+    fail=1
+fi
+
 printf '== jukebox selftest\n'
 if ! QT_QPA_PLATFORM=offscreen python3 -m calder_falls.jukebox --selftest 2>"$work/jukebox.err"; then
     grep -v '^fluidsynth: warning' "$work/jukebox.err" >&2 || true
     fail=1
 fi
 
-if [ "$#" -gt 0 ]; then
-    printf '== AppImage selftest: %s\n' "$1"
-    chmod +x -- "$1"
+for image in "$@"; do
+    printf '== AppImage selftest: %s\n' "$image"
+    chmod +x -- "$image"
     # No FUSE on CI runners, so let the AppImage unpack itself instead of mounting
-    if ! APPIMAGE_EXTRACT_AND_RUN=1 QT_QPA_PLATFORM=offscreen "$1" --selftest 2>"$work/appimage.err"; then
+    if ! APPIMAGE_EXTRACT_AND_RUN=1 QT_QPA_PLATFORM=offscreen "$image" --selftest 2>"$work/appimage.err"; then
         grep -v '^fluidsynth: warning' "$work/appimage.err" >&2 || true
         fail=1
     fi
-fi
+done
 
 if [ "$fail" -ne 0 ]; then
     printf '\nsmoke-test: FAILED\n' >&2

@@ -2,6 +2,7 @@ numpy
 scipy
 mido
 pyfluidsynth
+bink
 sounddevice
 soundfile
 PyQt6

@@ -1,0 +1,55 @@
+/* Midnight. Placeholders like @bg@ are filled in by themes/__init__.py
+   from whichever stage the story is in. */
+
+QWidget { background: @bg@; color: @text@; font-size: @px@px; }
+QMainWindow, QDialog { background: @bg@; }
+QLabel { background: transparent; }
+QLabel#dim, QLabel#small { color: @dim@; font-size: @small@px; }
+QLabel#chapter { font-size: @px@px; color: @text@; letter-spacing: 1px; }
+QLabel#bigtitle { font-family: "Courier Prime"; font-size: 40px; color: @text@; letter-spacing: 6px; }
+QLabel#subtitle { color: @dim@; font-size: @small@px; letter-spacing: 2px; }
+
+QFrame#topstrip { background: @panel@; border-bottom: 1px solid @border@; }
+QFrame#choicebar { background: transparent; }
+
+QPushButton {
+    background: @panel@; color: @text@; border: 1px solid @border@;
+    padding: 7px 14px; border-radius: 2px; text-align: left;
+}
+QPushButton:hover { border-color: @accent@; background: @hover@; }
+QPushButton:pressed { background: @panel2@; }
+QPushButton:disabled { color: @dim@; border-color: @panel2@; }
+QPushButton#choice { padding: 9px 14px; }
+QPushButton#menu, QPushButton#flat { text-align: center; }
+
+QTabWidget::pane { border: 1px solid @border@; background: @panel@; }
+QTabBar::tab {
+    background: @bg@; color: @dim@; padding: 6px 12px; border: 1px solid @border@;
+    border-bottom: none; margin-right: 2px;
+}
+QTabBar::tab:selected { background: @panel@; color: @text@; }
+
+QScrollArea { border: none; background: transparent; }
+QScrollBar:vertical { background: @bg@; width: 10px; margin: 0; }
+QScrollBar::handle:vertical { background: @border@; min-height: 24px; border-radius: 3px; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QScrollBar:horizontal { height: 0; }
+
+QComboBox, QSpinBox {
+    background: @panel@; border: 1px solid @border@; padding: 4px 8px; color: @text@;
+}
+QComboBox QAbstractItemView { background: @panel@; color: @text@; selection-background-color: @hover@; }
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 14px; height: 14px; border: 1px solid @border@; background: @bg@;
+}
+QCheckBox::indicator:checked, QRadioButton::indicator:checked { background: @accent@; }
+QSlider::groove:horizontal { height: 4px; background: @border@; }
+QSlider::sub-page:horizontal { background: @accent@; }
+QSlider::handle:horizontal { background: @text@; width: 12px; margin: -5px 0; border-radius: 6px; }
+QProgressBar { border: 1px solid @border@; background: @bg@; height: 6px; }
+QProgressBar::chunk { background: @accent@; }
+QMenu { background: @panel@; border: 1px solid @border@; }
+QMenu::item { padding: 6px 18px; }
+QMenu::item:selected { background: @hover@; }
+QToolTip { background: @panel@; color: @text@; border: 1px solid @border@; }
+QTextBrowser { background: @panel@; border: 1px solid @border@; padding: 10px; }
