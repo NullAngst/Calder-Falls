@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#B23A22" stop-opacity="0.85"/>
+      <stop offset="0.35" stop-color="#B23A22" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#B23A22" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fog" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3A3D42" stop-opacity="0"/>
+      <stop offset="0.45" stop-color="#3A3D42" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#2A2C30" stop-opacity="1"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="72" fill="#1A1C1F"/>
+  <!-- light -->
+  <circle cx="256" cy="70" r="70" fill="url(#glow)"/>
+  <!-- legs and bracing -->
+  <g stroke="#050505" stroke-width="12" stroke-linecap="square" fill="none">
+    <line x1="190" y1="262" x2="150" y2="470"/>
+    <line x1="322" y1="262" x2="362" y2="470"/>
+    <line x1="232" y1="262" x2="222" y2="470"/>
+    <line x1="280" y1="262" x2="290" y2="470"/>
+  </g>
+  <g stroke="#050505" stroke-width="6" fill="none">
+    <line x1="180" y1="312" x2="332" y2="312"/>
+    <line x1="170" y1="366" x2="342" y2="366"/>
+    <line x1="160" y1="420" x2="352" y2="420"/>
+    <line x1="186" y1="312" x2="339" y2="366"/>
+    <line x1="326" y1="312" x2="173" y2="366"/>
+    <line x1="173" y1="366" x2="349" y2="420"/>
+    <line x1="339" y1="366" x2="163" y2="420"/>
+  </g>
+  <!-- tank -->
+  <path d="M168 150 L256 96 L344 150 Z" fill="#050505"/>
+  <rect x="166" y="148" width="180" height="104" fill="#050505"/>
+  <path d="M166 252 Q256 282 346 252 L346 246 L166 246 Z" fill="#050505"/>
+  <rect x="160" y="196" width="192" height="6" fill="#050505"/>
+  <!-- mast and red light -->
+  <rect x="253" y="74" width="6" height="26" fill="#050505"/>
+  <circle cx="256" cy="70" r="9" fill="#B23A22"/>
+  <!-- fog over the legs -->
+  <rect x="0" y="300" width="512" height="212" rx="0" fill="url(#fog)"/>
+  <rect x="0" y="440" width="512" height="72" fill="#2A2C30" opacity="0.6"/>
+  <rect width="512" height="512" rx="72" fill="none" stroke="#1A1C1F" stroke-width="2"/>
+</svg>

@@ -1,0 +1,7 @@
+numpy
+scipy
+mido
+pyfluidsynth
+sounddevice
+soundfile
+PyQt6
