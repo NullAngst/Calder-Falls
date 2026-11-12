@@ -143,6 +143,41 @@ def run(app, win):
         setattr(win.settings, k, val)
     win.apply_settings()
 
+    print("no flicker means a still picture", flush=True)
+    settle(app, win)
+    for mode in ("off", "full"):
+        win.settings.flicker = mode
+        win.apply_settings()
+        for stage in ("midnight", "fog", "bleed", "static", "dead_signal"):
+            win.set_stage(stage, instant=True)
+            pump(app, 0.2)
+            a = win.overlay.grab().toImage()
+            pump(app, 0.6)
+            b = win.overlay.grab().toImage()
+            if mode == "off":
+                check(a == b, f"no flicker: the {stage} overlay draws the same frame twice")
+            elif stage == "static":
+                check(a != b, "full flicker: the overlay does change between frames (the check can see motion)")
+        # the dark flashlight scene with a dying battery
+        win.set_stage("midnight", instant=True)
+        win.view.set_dark(True)
+        win.view.battery_low = True
+        from PyQt6.QtCore import QPointF
+        win.view.mouse = QPointF(300, 200)
+        pump(app, 0.2)
+        a = win.view.grab().toImage()
+        pump(app, 0.6)
+        b = win.view.grab().toImage()
+        if mode == "off":
+            check(a == b, "no flicker: the low-battery flashlight holds steady")
+            check(not win.overlay.timer.isActive(), "no flicker: the overlay stops repainting")
+        win.view.set_dark(False)
+        win.view.battery_low = False
+    for k, val in vars(base).items():
+        setattr(win.settings, k, val)
+    win.apply_settings()
+    win.set_stage(win.session.state.theme, instant=True)
+
     print("timed choice", flush=True)
     settle(app, win)
     win.settings.timed_choices = True

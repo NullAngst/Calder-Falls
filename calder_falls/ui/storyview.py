@@ -58,6 +58,7 @@ class StoryView(QWidget):
         self.font_ = QFont("Courier Prime", 15)
         self.speed = 60.0            # characters per second, 0 = instant
         self.flashlight_cone = True
+        self.flicker_mode = "gentle"    # the flicker setting: off, gentle, full
         self.dark = False
         self.battery_low = False
         self.shadow = ""
@@ -279,7 +280,8 @@ class StoryView(QWidget):
                     w, at = self.rng.choice(hits)
                     self.temp_swap = (i, at, at + len(w), UNEASY[w], now + 0.22)
                     changed = True
-        if s and s.drift > 0:
+        if s and s.drift > 0 and self.flicker_mode != "off":
+            # with no flicker the letters stay where they drifted to
             self.drift_seed = int(now * 1.3)
             changed = True
         if self.dark or (s and s.split):
@@ -401,9 +403,15 @@ class StoryView(QWidget):
             return
         radius = 150.0
         if self.battery_low:
-            radius *= 0.75 + 0.25 * self.rng.random()
-            if self.rng.random() < 0.04:
-                radius = 0
+            if self.flicker_mode == "full":
+                radius *= 0.75 + 0.25 * self.rng.random()
+                if self.rng.random() < 0.04:
+                    radius = 0
+            elif self.flicker_mode == "gentle":
+                # a slow fade in and out, about once every four seconds
+                radius *= 0.85 + 0.15 * math.sin(time.monotonic() * 1.5)
+            else:
+                radius *= 0.85      # dimmer, and still
         g = QRadialGradient(self.mouse, max(radius, 1.0))
         hole = QColor(bg)
         hole.setAlpha(0)

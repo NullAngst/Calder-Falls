@@ -183,7 +183,10 @@ class GameWindow(QMainWindow):
             self.stage_t = min(1.0, self.stage_t + 0.025)
             st = themes.interpolate(self.stage_from, self.stage_to, self.stage_t)
             now = time.monotonic()
-            restyle = self.stage_t >= 1.0 or now - self.last_restyle > 0.25
+            # Restyling repaints the whole window. With no flicker, do it once
+            # at the end of the fade instead of four times a second.
+            step = 0.25 if self.settings.flicker != "off" else 999.0
+            restyle = self.stage_t >= 1.0 or now - self.last_restyle > step
             self._push_stage(st, restyle)
 
     def _push_stage(self, st, restyle):
@@ -202,6 +205,9 @@ class GameWindow(QMainWindow):
         self.view.set_font(s.font, s.text_size)
         self.view.speed = float(s.reveal_speed)
         self.view.flashlight_cone = s.flashlight_cone
+        self.view.flicker_mode = s.flicker
+        self.overlay.set_mode(s.flicker)
+        self.title.tower.blinks = s.flicker != "off"
         if self.audio:
             self.audio.set_volume(s.music_volume / 100.0 * 0.95)
         self._push_stage(self.stage_now, restyle=True)
@@ -228,7 +234,8 @@ class GameWindow(QMainWindow):
 
     def show_title(self):
         self.stack.setCurrentWidget(self.title)
-        self.title.refresh(self.profile, self.settings.fourth_wall, self._any_save() is not None)
+        self.title.refresh(self.profile, self.settings.fourth_wall, self._any_save() is not None,
+                           self.settings.flicker)
         self.setWindowTitle(APP_TITLE)
         self.set_stage("midnight", instant=True)
         self.unsetCursor()

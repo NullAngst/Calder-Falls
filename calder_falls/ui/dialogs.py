@@ -73,7 +73,7 @@ class FirstLaunchDialog(QDialog):
         msg.setWordWrap(True)
         v.addWidget(msg)
         self.group = QButtonGroup(self)
-        for key, label in (("off", "No flicker: no flashes, no scanlines"),
+        for key, label in (("off", "No flicker: a still picture, nothing flashes or moves on its own"),
                            ("gentle", "Gentle (default): softened flicker"),
                            ("full", "Full: everything the game does")):
             rb = QRadioButton(label)
@@ -106,6 +106,8 @@ class SettingsDialog(QDialog):
         for k, label in (("off", "No flicker"), ("gentle", "Gentle"), ("full", "Full")):
             self.flicker.addItem(label, k)
         self.flicker.setCurrentIndex(["off", "gentle", "full"].index(settings.flicker))
+        self.flicker.setToolTip("No flicker: no flashes, no scanlines, grain and fog frozen, "
+                                "the flashlight steady, the title screen light always on.")
         form.addRow("Flicker and flashes", self.flicker)
         self.honest = QCheckBox("Honest controls (a click always does what the button says)")
         self.honest.setChecked(settings.honest_controls)

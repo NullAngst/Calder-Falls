@@ -1,5 +1,19 @@
 # Changes
 
+2026.11.11 - Accessibility fix
+
+* No flicker is now a still picture. The film grain and the fog freeze in place, and the overlay stops repainting entirely
+* The low-battery flashlight no longer cuts out with no flicker set. Gentle fades it slowly instead of jumping
+* Dead Signal's drifting letters hold still where they drifted, with no flicker set
+* The title screen's water tower light stays lit, with no flicker set
+* Theme fades restyle the window once at the end instead of four times a second, with no flicker set
+* Gentle slides the grain one pixel at a time instead of jumping it to a random spot every frame
+* The grain only moves on the overlay's own timer. Before, any repaint underneath it, such as text typing out, re-rolled its position
+* The window selftest now checks that, with no flicker, every theme stage and the dark flashlight scene draw the same frame twice. A control run on full flicker makes sure the check can see motion at all
+* The settings and first-launch wording says what no flicker does
+
+Reasons for changes: with no flicker set, the screen still flickered at the sides. The setting only removed the flashes and scanlines. The grain was redrawn at a new random position about 14 times a second, and against the darker CRT edges that reads as flicker. 14 Hz is also inside the range that matters for photosensitive players, so the setting wasn't doing its job.
+
 2026.11.11 - Build fix
 
 * The music check for "this control changes the cue" also passes when the change is at least 3e-4 RMS on its own, about -70 dBFS and three times the PS2 filter's 12-bit noise floor. The old rule, more than 1% of the whole mix, still applies alongside it

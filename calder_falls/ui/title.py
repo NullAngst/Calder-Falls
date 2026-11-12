@@ -38,12 +38,18 @@ class Tower(QWidget):
         svg = os.path.join(paths.data_dir(), "assets", "icon", "calder-falls.svg")
         self.renderer = QSvgRenderer(svg)
         self.on = True
+        self.blinks = True      # off with the no-flicker setting: the light stays lit
         self.setMinimumSize(300, 300)
         t = QTimer(self)
         t.timeout.connect(self._blink)
         t.start(900)
 
     def _blink(self):
+        if not self.blinks:
+            if not self.on:
+                self.on = True
+                self.update()
+            return
         self.on = not self.on
         self.update()
 
@@ -106,7 +112,8 @@ class TitleScreen(QWidget):
         col.addStretch(2)
         h.addLayout(col, 2)
 
-    def refresh(self, profile, fourth_wall, can_continue):
+    def refresh(self, profile, fourth_wall, can_continue, flicker="gentle"):
+        self.tower.blinks = flicker != "off"
         self.sub.setText(subtitle_for(profile, fourth_wall))
         self.buttons["continue"].setEnabled(can_continue)
         self.buttons["load"].setEnabled(can_continue)

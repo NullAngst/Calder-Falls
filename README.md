@@ -52,7 +52,7 @@ The game autosaves at every loop and chapter start. Save to one of three slots f
 
 ## Settings
 
-- Flicker and flashes: no flicker, gentle (the default), or full. No flicker kills every flash and scanline.
+- Flicker and flashes: no flicker, gentle (the default), or full. No flicker is a still picture: no flashes or scanlines, the film grain and fog frozen in place, the low-battery flashlight steady, the drifting letters in Act IV held where they drifted, and the title screen light always on. Gentle keeps the effects but slides the grain instead of jumping it and softens the flicker.
 - Honest controls: turns off the choices that change what they say on hover and the buttons that slide away from the mouse. Every other effect stays.
 - Flashlight cone: off dims dark scenes evenly instead.
 - Timed choices: off by default.
