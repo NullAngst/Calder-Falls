@@ -1,5 +1,14 @@
 # Changes
 
+2026.11.11 - UX fix
+
+* The story pane follows the line being typed. Before, it jumped to the bottom of the whole new passage while that passage was still blank, so the text typed out above the visible area
+* When the choice buttons appear and shrink the story pane, the end of the text stays on screen
+* Scrolling up to reread while text is typing leaves you where you are, including when a scroll-follow was already queued before you scrolled. Scrolling back down to the typing line, picking a choice, or clicking to skip turns following back on
+* The window selftest checks all three: the typing line stays on screen through three choices, the end of the text is visible after the choices appear, and a scroll up is not undone
+
+Reasons for changes: picking an option scrolled the view below the text that was filling in, so you had to scroll back up to read it. The story view lays out each passage at full length before typing it, and the old code scrolled to the bottom of that layout. The selftest's new check also turned up the choice-button case, which had the same effect from the other side.
+
 2026.11.11 - Accessibility fix
 
 * No flicker is now a still picture. The film grain and the fog freeze in place, and the overlay stops repainting entirely

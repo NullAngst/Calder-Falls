@@ -70,7 +70,9 @@ class StoryView(QWidget):
         self.last_tick = time.monotonic()
         self.carry = 0.0
         self.pause_until = 0.0
-        self.follow = True
+        self.follow = True           # keep the typing line in view
+        self._auto_scroll = False    # True while we move the scrollbar ourselves
+        self._last_scroll = 0
         self.setMouseTracking(True)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         self.timer = QTimer(self)
@@ -80,6 +82,9 @@ class StoryView(QWidget):
         self.fx_timer.timeout.connect(self._fx)
         self.fx_timer.start(90)
         scroll.verticalScrollBar().valueChanged.connect(self._scrolled)
+        # The pane changes size when the choice buttons appear or go away.
+        # When that happens, keep the typing line in view.
+        scroll.verticalScrollBar().rangeChanged.connect(self._range_changed)
 
     # ------------------------------------------------------------ content
     def clear(self):
@@ -89,7 +94,12 @@ class StoryView(QWidget):
 
     def add(self, text, kind="story"):
         self.paras.append(Para(text, kind))
+        if kind == "echo":
+            # the player just picked something: bring the new text into view
+            self.follow = True
         self._relayout()
+        if self.follow:
+            self._follow_reveal()
 
     def add_pause(self, seconds):
         self.paras.append(Para("", "pause", pause=seconds))
@@ -111,7 +121,9 @@ class StoryView(QWidget):
             p.shown = len(p.text)
             p.pause = 0.0
         self.pause_until = 0.0
+        self.follow = True
         self.update()
+        self._follow_reveal()
         self.revealed.emit()
 
     def is_revealing(self):
@@ -229,17 +241,64 @@ class StoryView(QWidget):
                 self.pause_until = now + 0.12
         self.update()
         if self.follow:
-            self._to_bottom()
+            self._follow_reveal()
         if not self.is_revealing():
             self.revealed.emit()
 
     def _to_bottom(self):
         sb = self.scroll.verticalScrollBar()
-        QTimer.singleShot(0, lambda: sb.setValue(sb.maximum()))
+        QTimer.singleShot(0, lambda: self._set_scroll(sb.maximum()))
+
+    def _set_scroll(self, value):
+        sb = self.scroll.verticalScrollBar()
+        self._auto_scroll = True
+        sb.setValue(value)
+        self._last_scroll = sb.value()
+        self._auto_scroll = False
+
+    def reveal_bottom(self):
+        """The y position, in this widget, of the bottom of the last line
+        that has actually been typed out. The widget itself is already as
+        tall as the whole passage, so its bottom is the wrong place to scroll."""
+        for p in reversed(self.paras):
+            if p.kind == "pause" or p.shown <= 0 or p.layout is None:
+                continue
+            line = p.layout.lineForTextPosition(max(0, min(p.shown, len(p.text)) - 1))
+            if not line.isValid():
+                return p.top + p.height
+            return p.top + line.position().y() + line.height()
+        return float(MARGIN_Y)
+
+    def _follow_reveal(self):
+        # deferred, so a fresh relayout has resized the widget first
+        QTimer.singleShot(0, self._follow_now)
+
+    def _follow_now(self):
+        # Queued follows can land after the player has scrolled up; respect that.
+        if not self.follow:
+            return
+        sb = self.scroll.verticalScrollBar()
+        view_h = self.scroll.viewport().height()
+        # keep the typing line about one line above the bottom edge
+        target = int(self.reveal_bottom() + 28 - view_h)
+        target = max(0, min(target, sb.maximum()))
+        if target > sb.value():
+            self._set_scroll(target)
+
+    def _range_changed(self, *_):
+        if self.follow:
+            self._follow_reveal()
 
     def _scrolled(self, *_):
         sb = self.scroll.verticalScrollBar()
-        self.follow = sb.value() >= sb.maximum() - 4
+        if not self._auto_scroll:
+            # the player scrolled: going up means they're reading back, so
+            # stop following; coming back down to the typing line resumes it
+            if sb.value() < self._last_scroll:
+                self.follow = False
+            elif sb.value() + self.scroll.viewport().height() >= self.reveal_bottom():
+                self.follow = True
+        self._last_scroll = sb.value()
         if not self.pending_scrollback:
             return
         top = sb.value()

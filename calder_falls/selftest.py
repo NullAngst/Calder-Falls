@@ -118,6 +118,58 @@ def run(app, win):
         block = win.audio.render(2.0)
         check(np.isfinite(block).all(), "audio stays finite in Act I")
 
+    print("scrolling follows the typing", flush=True)
+    win.settings.reveal_speed = 55
+    win.apply_settings()
+    win.resize(1100, 640)
+    seen_ok = []
+    for _ in range(3):
+        settle(app, win)
+        c = pick(win, {})
+        if c is None:
+            break
+        win.on_choice(c)
+        for _ in range(12):
+            pump(app, 0.25)
+            if not win.view.is_revealing():
+                break
+            sb = win.scroll.verticalScrollBar()
+            top = sb.value()
+            bottom = top + win.scroll.viewport().height()
+            y = win.view.reveal_bottom()
+            seen_ok.append(top <= y <= bottom + 2)
+    check(bool(seen_ok) and all(seen_ok),
+          f"the line being typed stays on screen after a choice ({sum(seen_ok)} of {len(seen_ok)} samples)")
+    win.view.skip()
+    pump(app, 0.1)
+    sb = win.scroll.verticalScrollBar()
+    y = win.view.reveal_bottom()
+    check(sb.value() <= y <= sb.value() + win.scroll.viewport().height() + 2,
+          "after skipping and the choices appearing, the end of the text is on screen")
+    # reading back while text types: scrolling up must not get yanked down.
+    # Needs a moment where text is still typing and there is room to scroll up.
+    tested = None
+    for _ in range(8):
+        settle(app, win)
+        c = pick(win, {})
+        if c is None:
+            break
+        win.on_choice(c)
+        pump(app, 0.4)
+        sb = win.scroll.verticalScrollBar()
+        if win.view.is_revealing() and sb.value() >= 120:
+            sb.setValue(sb.value() - 120)   # the player scrolls up
+            held = sb.value()
+            pump(app, 1.0)
+            tested = sb.value() == held
+            break
+        win.view.skip()
+        pump(app, 0.1)
+    check(tested is True, "scrolling up to reread while text types is left alone")
+    win.view.skip()
+    pump(app, 0.1)
+    win.resize(1320, 820)
+
     print("settings", flush=True)
     base = Settings(**vars(win.settings))
     variants = [
