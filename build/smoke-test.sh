@@ -49,7 +49,8 @@ note_failure() {
             # The lines that say what broke. FluidSynth's missing-driver warnings and
             # GLib's assertion chatter from a system library are noise, not causes.
             grep -E 'FAIL|[Ee]rror|Traceback|failed|not found|missing' -- "$2" \
-                | grep -v -e '^fluidsynth: warning' -e 'GLib-GObject-CRITICAL' | head -n 60 || true
+                | grep -v -e '^fluidsynth: warning' -e 'GLib-GObject-CRITICAL' -e 'PortAudio loaded' \
+                | head -n 60 || true
         fi
     } >>"$summary"
 }

@@ -202,7 +202,12 @@ class StoryView(QWidget):
             self._layout_para(p, p.text, width)
             p.top = y
             y += p.height + gap
-        self.setMinimumHeight(int(y + MARGIN_Y * 2))
+        need = int(y + MARGIN_Y * 2)
+        self.setMinimumHeight(need)
+        if self.height() < need:
+            # Resize now rather than waiting for the scroll area's next layout
+            # pass, so its scroll range is right before the first character types.
+            self.resize(self.width(), need)
         self.update()
 
     def resizeEvent(self, _e):
@@ -241,7 +246,10 @@ class StoryView(QWidget):
                 self.pause_until = now + 0.12
         self.update()
         if self.follow:
-            self._follow_reveal()
+            # Typing never changes the layout (each passage is laid out in full
+            # when it is added), so scroll in the same step as the character
+            # appears. Queuing it left the typing line a step behind the view.
+            self._follow_now()
         if not self.is_revealing():
             self.revealed.emit()
 

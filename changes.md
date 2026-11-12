@@ -1,5 +1,13 @@
 # Changes
 
+2026.11.12 - Build fix
+
+* The story pane scrolls in the same step that types each character, instead of queuing the scroll for the next pass of the event loop
+* When a passage is added, the story view resizes right away, so the scroll range is correct before the first character types
+* The smoke test's failure summary leaves out the "PortAudio loaded, no audio server" line, which is information, not a failure
+
+Reasons for changes: the release failed on "the line being typed stays on screen after a choice", 34 of 35 samples. The scroll followed the typing one event-loop pass behind, and on the slower runner one sample landed in that gap. On screen that was a lag of a few milliseconds, but nothing required it. Six selftests run at once on two cores, each about three times slower than normal, now pass every sample.
+
 2026.11.11 - UX fix
 
 * The story pane follows the line being typed. Before, it jumped to the bottom of the whole new passage while that passage was still blank, so the text typed out above the visible area
