@@ -176,7 +176,9 @@ def routes(tmp):
     print("routes to every ending", flush=True)
     seen_tags = set()
     for want, kw in ROUTES:
-        p = Player(seed=hash(want) % 1000, save_dir=tmp, **kw)
+        # A fixed seed per route. hash() would differ between runs, since
+        # Python randomizes string hashes per process.
+        p = Player(seed=sum(map(ord, want)), save_dir=tmp, **kw)
         try:
             steps = p.play()
             got = p.s.state.ending

@@ -13,6 +13,10 @@
 # 6. Any AppImage paths given run their own selftest too:
 #      bash build/smoke-test.sh dist/Calder-Falls-x86_64.AppImage dist/Calder-Falls-Jukebox-x86_64.AppImage
 #
+# Every stage runs even if an earlier one failed. If anything failed, the very
+# end of the output names each failed stage and repeats its FAIL and error
+# lines, so the cause is at the bottom of the log where you can always find it.
+#
 # Needs inklecate: build/tools/inklecate, on PATH, or $INKLECATE.
 
 set -euo pipefail
@@ -23,7 +27,7 @@ root=$(dirname -- "$here")
 cd -- "$root" || exit 1
 
 missing=""
-for cmd in python3 cmp; do
+for cmd in python3 cmp grep env; do
     command -v "$cmd" >/dev/null 2>&1 || missing="$missing $cmd"
 done
 if [ -n "$missing" ]; then
@@ -34,82 +38,94 @@ fi
 work=$(mktemp -d "${TMPDIR:-/tmp}/calder-smoke.XXXXXX")
 trap 'rm -rf -- "$work"' EXIT
 
-fail=0
+summary="$work/summary"
+: >"$summary"
+
+# note_failure <stage name> <log file or empty>
+note_failure() {
+    {
+        printf '\n[%s]\n' "$1"
+        if [ -n "${2:-}" ] && [ -f "$2" ]; then
+            # The lines that say what broke. FluidSynth's missing-driver warnings are noise.
+            grep -E 'FAIL|[Ee]rror|Traceback|failed|not found|missing' -- "$2" \
+                | grep -v '^fluidsynth: warning' | head -n 60 || true
+        fi
+    } >>"$summary"
+}
+
+# stage <name> <command...>
+# Runs a command, shows its output, and records it in the summary if it fails.
+stage() {
+    local name=$1
+    shift
+    local log="$work/stage.log"
+    printf '== %s\n' "$name"
+    local rc=0
+    "$@" >"$log" 2>&1 || rc=$?
+    grep -v '^fluidsynth: warning' -- "$log" || true
+    if [ "$rc" -ne 0 ]; then
+        printf 'smoke-test: stage "%s" exited with %s\n' "$name" "$rc"
+        note_failure "$name (exit $rc)" "$log"
+    fi
+}
 
 printf '== MIDI cues are current\n'
 # A warning, not a failure: a new Python can change what random.randint
 # returns for the same seed, which would flag every cue with no edit on our end.
-python3 music/generate.py --out "$work/cues" >/dev/null
-stale=0
-for f in music/cues/*.mid; do
-    name=$(basename -- "$f")
-    if ! cmp -s -- "$f" "$work/cues/$name"; then
-        printf 'smoke-test: warning: %s differs from what music/generate.py writes now\n' "$f" >&2
-        stale=1
+if python3 music/generate.py --out "$work/cues" >"$work/generate.log" 2>&1; then
+    stale=0
+    for f in music/cues/*.mid; do
+        name=$(basename -- "$f")
+        if ! cmp -s -- "$f" "$work/cues/$name"; then
+            printf 'smoke-test: warning: %s differs from what music/generate.py writes now\n' "$f"
+            stale=1
+        fi
+    done
+    for f in "$work"/cues/*.mid; do
+        name=$(basename -- "$f")
+        if [ ! -f "music/cues/$name" ]; then
+            printf 'smoke-test: music/cues/%s is missing\n' "$name" | tee -a "$work/generate.log"
+            note_failure "MIDI cues: music/cues/$name is missing" ""
+        fi
+    done
+    if [ "$stale" -ne 0 ]; then
+        printf 'smoke-test: warning: regenerate with python3 music/generate.py and listen again\n'
     fi
-done
-for f in "$work"/cues/*.mid; do
-    name=$(basename -- "$f")
-    if [ ! -f "music/cues/$name" ]; then
-        printf 'smoke-test: music/cues/%s is missing\n' "$name" >&2
-        fail=1
-    fi
-done
-if [ "$stale" -ne 0 ]; then
-    printf 'smoke-test: warning: regenerate with python3 music/generate.py and listen again\n' >&2
+else
+    cat -- "$work/generate.log"
+    note_failure "MIDI cues: music/generate.py failed" "$work/generate.log"
 fi
 
-printf '== Calder.sf2 builds\n'
 # Built fresh to prove the script still runs. Not compared byte for byte,
 # since numpy and scipy updates can move the last bit of a sample.
-if ! python3 soundfonts/build_calder.py "$work/Calder.sf2" >/dev/null; then
-    printf 'smoke-test: soundfonts/build_calder.py failed\n' >&2
-    fail=1
-fi
+stage "Calder.sf2 builds" python3 soundfonts/build_calder.py "$work/Calder.sf2"
 
-printf '== music checks\n'
-# FluidSynth warns about missing audio drivers on a headless runner; that is noise here.
-if ! python3 -m calder_falls.audio.smoke 2>"$work/smoke.err"; then
-    grep -v '^fluidsynth: warning' "$work/smoke.err" >&2 || true
-    fail=1
-fi
+stage "music checks" python3 -m calder_falls.audio.smoke
 
-printf '== story checks\n'
-if ! python3 -m calder_falls.storytest; then
-    fail=1
-fi
+stage "story checks" python3 -m calder_falls.storytest
 
 # Settings, saves and the profile go to a throwaway folder, not your real ones
 export XDG_DATA_HOME="$work/xdg"
 
 # Qt complains under LC_ALL=C and switches to C.UTF-8 itself; give it that up front.
 # Nothing below parses command output, so the parsing rule above is unaffected.
-qt_locale=C.UTF-8
+qt_env="LC_ALL=C.UTF-8"
 
-printf '== game window selftest\n'
-if ! LC_ALL=$qt_locale QT_QPA_PLATFORM=offscreen python3 -m calder_falls --selftest 2>"$work/game.err"; then
-    grep -v '^fluidsynth: warning' "$work/game.err" >&2 || true
-    fail=1
-fi
+stage "game window selftest" env "$qt_env" QT_QPA_PLATFORM=offscreen python3 -m calder_falls --selftest
 
-printf '== jukebox selftest\n'
-if ! LC_ALL=$qt_locale QT_QPA_PLATFORM=offscreen python3 -m calder_falls.jukebox --selftest 2>"$work/jukebox.err"; then
-    grep -v '^fluidsynth: warning' "$work/jukebox.err" >&2 || true
-    fail=1
-fi
+stage "jukebox selftest" env "$qt_env" QT_QPA_PLATFORM=offscreen python3 -m calder_falls.jukebox --selftest
 
 for image in "$@"; do
-    printf '== AppImage selftest: %s\n' "$image"
     chmod +x -- "$image"
     # No FUSE on CI runners, so let the AppImage unpack itself instead of mounting
-    if ! LC_ALL=$qt_locale APPIMAGE_EXTRACT_AND_RUN=1 QT_QPA_PLATFORM=offscreen "$image" --selftest 2>"$work/appimage.err"; then
-        grep -v '^fluidsynth: warning' "$work/appimage.err" >&2 || true
-        fail=1
-    fi
+    stage "AppImage selftest: $image" env "$qt_env" APPIMAGE_EXTRACT_AND_RUN=1 QT_QPA_PLATFORM=offscreen "$image" --selftest
 done
 
-if [ "$fail" -ne 0 ]; then
-    printf '\nsmoke-test: FAILED\n' >&2
+if [ -s "$summary" ]; then
+    printf '\n==================== smoke-test: FAILED ====================\n'
+    printf 'What failed, and the lines from it that say why:\n'
+    cat -- "$summary"
+    printf '\n=============================================================\n'
     exit 1
 fi
 printf '\nsmoke-test: everything passed\n'

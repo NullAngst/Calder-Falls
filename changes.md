@@ -2,6 +2,14 @@
 
 2026.11.11 - Build fix
 
+* The smoke test ends with a summary when anything fails: each failed stage by name, plus its FAIL and error lines
+* Every stage's output, stderr included, now prints in the log, not only when the stage fails
+* Story check routes use fixed seeds. They were seeded from hash(), which Python randomizes per run, so the runner played different routes than a local run did
+
+Reasons for changes: the second failed run gave no visible reason. GitHub's log viewer only draws the lines on screen, so a copied log loses the middle, and that is where the failing stage was. The summary puts the cause at the bottom. The seed change makes a failing route reproducible locally. All 300 seeded routes and 40 wandering runs pass here, under both Python 3.13 and 3.14, so the seed was probably not the cause.
+
+2026.11.11 - Build fix
+
 * The PortAudio check in the jukebox and game selftests now fails only when the library is missing or can't be loaded. PortAudio refusing to start because there is no sound server counts as loaded
 * The game window selftest runs the same PortAudio check as the jukebox
 * Qt runs under C.UTF-8 in the smoke test and the AppImage selftest step, which removes the locale warning from the log
