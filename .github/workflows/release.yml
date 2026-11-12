@@ -55,6 +55,7 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: "1"
           QT_QPA_PLATFORM: offscreen
+          LC_ALL: C.UTF-8
           XDG_DATA_HOME: ${{ runner.temp }}/xdg
         run: |
           chmod +x dist/*.AppImage
