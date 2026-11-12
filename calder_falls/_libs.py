@@ -43,3 +43,21 @@ def prepare():
         return original(name)
 
     ctypes.util.find_library = find_library
+
+
+def check_portaudio():
+    """For the selftests. Returns (ok, message).
+
+    Only a missing or unloadable library is a failure. PortAudio refusing
+    to start because there is no sound server (a CI runner has none) means
+    the library loaded fine, which is all the AppImage has to prove.
+    """
+    prepare()
+    try:
+        import sounddevice
+    except OSError as exc:  # library not found, or found and could not be loaded
+        return False, f"PortAudio failed to load: {exc}"
+    except Exception as exc:  # sounddevice.PortAudioError: loaded, but no audio server
+        return True, f"PortAudio loaded, no audio server here ({str(exc).splitlines()[0][:120]})"
+    return True, (f"PortAudio {sounddevice.get_portaudio_version()[1]}, "
+                  f"{len(sounddevice.query_devices())} audio device(s)")

@@ -1,5 +1,13 @@
 # Changes
 
+2026.11.11 - Build fix
+
+* The PortAudio check in the jukebox and game selftests now fails only when the library is missing or can't be loaded. PortAudio refusing to start because there is no sound server counts as loaded
+* The game window selftest runs the same PortAudio check as the jukebox
+* Qt runs under C.UTF-8 in the smoke test and the AppImage selftest step, which removes the locale warning from the log
+
+Reasons for changes: the GitHub runner's PortAudio is built with PulseAudio support and there is no PulseAudio server on the runner, so PortAudio loaded and then refused to initialize. The old check treated that the same as a missing library and failed the build. The container I built in had no PulseAudio support, so it never hit this.
+
 2026.11.11 - Initial release (step 2: the game)
 
 * All 13 chapters in Ink, about 31,600 words: the Prologue, the twelve Act I loops in three chapters, the Act II hub with the Pruitt and Dorsey houses and 9 Mill Street, Act III at St. Adalbert's, the Spindle and the library, Act IV at the water tower and the mill floor, five endings

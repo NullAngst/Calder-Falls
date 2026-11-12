@@ -268,12 +268,10 @@ def selftest(app, win):
     import numpy as np
     failures = []
     eng = win.engine
-    try:
-        import sounddevice
-        print(f"jukebox: PortAudio {sounddevice.get_portaudio_version()[1]}, "
-              f"{len(sounddevice.query_devices())} audio device(s)", flush=True)
-    except Exception as exc:  # the AppImage must be able to load PortAudio
-        print(f"jukebox: PortAudio failed to load: {exc}", flush=True)
+    from ._libs import check_portaudio
+    ok, msg = check_portaudio()
+    print(f"jukebox: {msg}", flush=True)
+    if not ok:  # the AppImage must be able to load PortAudio
         failures.append("portaudio")
     for row in range(win.list.count()):
         win.list.setCurrentRow(row)

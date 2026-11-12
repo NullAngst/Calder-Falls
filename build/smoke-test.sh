@@ -82,14 +82,18 @@ fi
 # Settings, saves and the profile go to a throwaway folder, not your real ones
 export XDG_DATA_HOME="$work/xdg"
 
+# Qt complains under LC_ALL=C and switches to C.UTF-8 itself; give it that up front.
+# Nothing below parses command output, so the parsing rule above is unaffected.
+qt_locale=C.UTF-8
+
 printf '== game window selftest\n'
-if ! QT_QPA_PLATFORM=offscreen python3 -m calder_falls --selftest 2>"$work/game.err"; then
+if ! LC_ALL=$qt_locale QT_QPA_PLATFORM=offscreen python3 -m calder_falls --selftest 2>"$work/game.err"; then
     grep -v '^fluidsynth: warning' "$work/game.err" >&2 || true
     fail=1
 fi
 
 printf '== jukebox selftest\n'
-if ! QT_QPA_PLATFORM=offscreen python3 -m calder_falls.jukebox --selftest 2>"$work/jukebox.err"; then
+if ! LC_ALL=$qt_locale QT_QPA_PLATFORM=offscreen python3 -m calder_falls.jukebox --selftest 2>"$work/jukebox.err"; then
     grep -v '^fluidsynth: warning' "$work/jukebox.err" >&2 || true
     fail=1
 fi
@@ -98,7 +102,7 @@ for image in "$@"; do
     printf '== AppImage selftest: %s\n' "$image"
     chmod +x -- "$image"
     # No FUSE on CI runners, so let the AppImage unpack itself instead of mounting
-    if ! APPIMAGE_EXTRACT_AND_RUN=1 QT_QPA_PLATFORM=offscreen "$image" --selftest 2>"$work/appimage.err"; then
+    if ! LC_ALL=$qt_locale APPIMAGE_EXTRACT_AND_RUN=1 QT_QPA_PLATFORM=offscreen "$image" --selftest 2>"$work/appimage.err"; then
         grep -v '^fluidsynth: warning' "$work/appimage.err" >&2 || true
         fail=1
     fi

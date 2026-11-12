@@ -98,6 +98,12 @@ def run(app, win):
     check(subtitle_for(Profile(launches=9), False) == "Ostrander County, October 1986",
           "title screen stays put with fourth-wall effects off")
 
+    print("audio library", flush=True)
+    from ._libs import check_portaudio
+    ok, msg = check_portaudio()
+    print("    " + msg, flush=True)
+    check(ok, "PortAudio loads")
+
     print("prologue with sound", flush=True)
     win.new_game()
     check(win.session is not None, "a new game starts")
