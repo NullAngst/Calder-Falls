@@ -10,9 +10,10 @@ What it proves, for every cue in the cue table:
 And once: every Ink music tag form parses, a bad one raises, and the
 Mill Floor cut really goes silent.
 
-"Audibly" here means the rendered samples differ by more than 1% RMS
-over a few seconds where that control has something to act on. It is a
-measurement, not a listening test.
+"Audibly" here means that over a few seconds where the control has
+something to act on, the samples change by more than 1% of the mix, or by
+more than 3e-4 RMS on their own (about -70 dBFS, well above the 12-bit
+floor of the PS2 filter). It is a measurement, not a listening test.
 """
 
 import sys
@@ -57,9 +58,20 @@ def window(name, at, setup=None, seconds=WINDOW):
         eng.close()
 
 
+# The PS2 filter crunches to 12 bits with dither, so anything quieter than
+# about 1e-4 RMS is lost in that noise floor. A control "audibly changes" a
+# cue when the difference it makes is either more than 1% of the whole mix,
+# or on its own at least 3e-4 RMS (about -70 dBFS), three times that floor.
+# The second rule is what lets a deliberately quiet layer, like the tape hiss
+# under Dawn's guitar, count as present without depending on how loud the
+# rest of the mix is.
+NOISE_FLOOR_RMS = 3e-4
+
+
 def differs(a, b):
+    d = rms(a - b)
     base = max(rms(a), 1e-6)
-    return rms(a - b) / base > 0.01
+    return d / base > 0.01 or d > NOISE_FLOOR_RMS
 
 
 def cue_checks(cue):

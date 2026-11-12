@@ -2,6 +2,13 @@
 
 2026.11.11 - Build fix
 
+* The music check for "this control changes the cue" also passes when the change is at least 3e-4 RMS on its own, about -70 dBFS and three times the PS2 filter's 12-bit noise floor. The old rule, more than 1% of the whole mix, still applies alongside it
+* The smoke test's failure summary leaves out GLib assertion warnings, which come from a system library and never caused a failure
+
+Reasons for changes: "dawn: noise layer off changes it" failed on the runner. Dawn's noise layer is a deliberately quiet tape hiss under a full guitar. Locally it changed the mix by 1.1% against a 1% threshold, and the runner's newer libraries pushed it just under. Judging a quiet layer against the loudness of the whole mix was the wrong test. The new rule asks whether the layer stands clearly above the noise floor. A layer that really is silent still fails, since its difference is exactly zero.
+
+2026.11.11 - Build fix
+
 * The smoke test ends with a summary when anything fails: each failed stage by name, plus its FAIL and error lines
 * Every stage's output, stderr included, now prints in the log, not only when the stage fails
 * Story check routes use fixed seeds. They were seeded from hash(), which Python randomizes per run, so the runner played different routes than a local run did
