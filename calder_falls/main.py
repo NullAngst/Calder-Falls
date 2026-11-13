@@ -39,6 +39,13 @@ def main(argv=None):
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--version", action="store_true")
     args, qt_args = ap.parse_known_args(argv)
+    if sys.stdout is None:
+        # The Windows build is a windowed program with no console, so print()
+        # goes nowhere. CALDER_LOG sends --version and --selftest output to a
+        # file instead, which is how the build workflow reads them.
+        log = os.environ.get("CALDER_LOG")
+        if log:
+            sys.stdout = sys.stderr = open(log, "w", encoding="utf-8", buffering=1)
     if args.version:
         print(__version__)
         return 0

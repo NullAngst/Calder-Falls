@@ -1,5 +1,20 @@
 # Changes
 
+2026.11.12 - Windows and Android builds, release flow
+
+* Windows build: `build/build-exe.py` makes a one-folder PyInstaller build with FluidSynth's Windows DLLs bundled, zips it, and wraps it in an Inno Setup installer that installs for the current user without admin rights
+* Saves and settings go in `%APPDATA%\calder-falls` on Windows. `XDG_DATA_HOME` still wins on any system
+* `calder_falls/_libs.py` points pyfluidsynth at the bundled DLL on Windows, under either of FluidSynth's DLL names
+* With no console (the windowed Windows EXE), `CALDER_LOG` sends `--selftest` and `--version` output to a file, so the workflow can read the selftest
+* Android app in `android/`: the same compiled story on inkjs in a WebView, with a JavaScript port of `story.py`, the theme stages and overlay, the typewriter and every text effect, the notebook, evidence board, map, radio, theories, saves, settings, the fake crash and the rewritten How to Play. Phone layout puts the tabs along the bottom; tablets in landscape get the desktop layout
+* `calder_falls/audio/variants.py` finds every music state the story reaches and renders each through the real engine to a seamless loop for Android. Static bleed runs live on the phone as an AudioWorklet port of the desktop's
+* Android story checks (`android/test/storytest.js`) play the same routes as the Python ones on inkjs; browser checks (`android/test/webtest.py`) play into Chapter 2 at phone and tablet sizes in headless Chromium
+* Release workflow: pushes to main and pull requests run checks only. Builds run from Run workflow; releasing needs a tag with an existing release and fails with a message otherwise. Files go up with `gh release upload --clobber`. The APK gets a signed SLSA build provenance attestation
+* The jukebox AppImage is gone. `build/jukebox-entry.py` is deleted; the jukebox still runs from source
+* Version 0.3.0
+
+Reasons for changes: the game only ran on Linux. Windows was a packaging job, since every Python dependency already had Windows wheels except FluidSynth's library. Android couldn't run PyQt6, scipy or PortAudio, so it got a separate thin front end over the same compiled story instead of a port of the desktop code. The old workflow released on tag push, which isn't how releases get made here.
+
 2026.11.12 - Build fix
 
 * The story pane scrolls in the same step that types each character, instead of queuing the scroll for the next pass of the event loop

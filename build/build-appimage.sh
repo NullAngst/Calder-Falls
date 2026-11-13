@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
-# Build Calder Falls as Linux AppImages.
+# Build Calder Falls as a Linux AppImage.
 #
-#   bash build/build-appimage.sh            # both
-#   bash build/build-appimage.sh game       # dist/Calder-Falls-x86_64.AppImage
-#   bash build/build-appimage.sh jukebox    # dist/Calder-Falls-Jukebox-x86_64.AppImage
+#   bash build/build-appimage.sh            # dist/Calder-Falls-x86_64.AppImage
 #
 # Needs the Python deps from requirements.txt plus pyinstaller, the system
-# libraries libfluidsynth3 and libportaudio2 (both get bundled), and for the
-# game a compiled story: story/build/main.json (python3 -m calder_falls.storytest
+# libraries libfluidsynth3 and libportaudio2 (both get bundled), and a
+# compiled story: story/build/main.json (python3 -m calder_falls.storytest
 # builds it with inklecate).
 #
 # This script targets glibc Linux (GitHub's Ubuntu runner). It finds the two
@@ -21,14 +19,10 @@ here=$(cd -- "$(dirname -- "$0")" && pwd -P) || exit 1
 root=$(dirname -- "$here")
 cd -- "$root" || exit 1
 
-which_apps=${1:-both}
-case "$which_apps" in
-    both | game | jukebox) ;;
-    *)
-        printf 'build-appimage: unknown target %s (use game, jukebox or both)\n' "$which_apps" >&2
-        exit 1
-        ;;
-esac
+if [ $# -gt 0 ]; then
+    printf 'build-appimage: takes no arguments (the jukebox AppImage is gone; run python3 -m calder_falls.jukebox from source)\n' >&2
+    exit 1
+fi
 
 missing=""
 for cmd in python3 pyinstaller curl find awk; do
@@ -77,7 +71,7 @@ for f in soundfonts/Calder.sf2 assets/icon/calder-falls-256.png; do
         exit 1
     fi
 done
-if [ "$which_apps" != jukebox ] && [ ! -f story/build/main.json ]; then
+if [ ! -f story/build/main.json ]; then
     printf 'build-appimage: story/build/main.json is missing, run python3 -m calder_falls.storytest first\n' >&2
     exit 1
 fi
@@ -178,15 +172,9 @@ EOF
     printf 'built dist/%s\n' "$out_name"
 }
 
-if [ "$which_apps" != jukebox ]; then
-    build_one calder-falls game-entry.py Calder-Falls-x86_64.AppImage \
-        "Calder Falls" "A text-based psychological horror game" \
-        --collect-all bink \
-        --add-data "$root/story/build/main.json:story/build" \
-        --add-data "$root/fonts:fonts" \
-        --add-data "$root/calder_falls/themes/midnight.qss:calder_falls/themes"
-fi
-if [ "$which_apps" != game ]; then
-    build_one calder-falls-jukebox jukebox-entry.py Calder-Falls-Jukebox-x86_64.AppImage \
-        "Calder Falls Jukebox" "Listen to and shape every Calder Falls music cue"
-fi
+build_one calder-falls game-entry.py Calder-Falls-x86_64.AppImage \
+    "Calder Falls" "A text-based psychological horror game" \
+    --collect-all bink \
+    --add-data "$root/story/build/main.json:story/build" \
+    --add-data "$root/fonts:fonts" \
+    --add-data "$root/calder_falls/themes/midnight.qss:calder_falls/themes"

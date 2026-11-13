@@ -6,9 +6,9 @@ Plan on 30 minutes if everything passes.
 
 ## 1. Run the build on GitHub
 
-1. Go to the repo's Actions tab, pick "Build and release", hit Run workflow.
-2. Wait for it to finish. The smoke test alone takes about 3 minutes.
-3. Green means the latest Python, PyQt6, scipy, numpy, pyfluidsynth, bink, sounddevice, mido, inklecate, PyInstaller and appimagetool all still work together. Download the artifacts and open both AppImages once, since a green build that won't open on your desktop is still broken. Play the Prologue in the game, with sound, as far as the front door.
+1. Go to the repo's Actions tab, pick "Build and release", hit Run workflow on main. The "Release target" job fails on a branch, on purpose; ignore it for a check.
+2. Wait for it to finish, about 25 minutes. The Android music render is the slow part.
+3. Green means the latest Python, PyQt6, scipy, numpy, pyfluidsynth, bink, sounddevice, mido, inklecate, PyInstaller, appimagetool, FluidSynth for Windows, Inno Setup, inkjs, Playwright, Gradle and the Android Gradle Plugin all still work together. Download the artifacts and open each one once, since a green build that won't open is still broken: the AppImage on your desktop, the Windows zip on a Windows machine if you have one, the APK on your phone. Play the Prologue, with sound, as far as the front door.
 
 If it's red, read which step failed and go to the matching section below.
 
@@ -37,6 +37,10 @@ If the smoke test fails right after an upgrade:
 - An error from `fluidsynth.py` usually means pyfluidsynth renamed something. The engine only uses `Synth`, `sfload`, `noteon`, `noteoff`, `cc`, `program_change`, `pitch_bend`, `all_sounds_off`, `program_reset`, `set_reverb`, `set_chorus` and the raw `_fl.fluid_synth_write_float`. Check pyfluidsynth's changelog for whichever one broke.
 - An error from `scipy.signal` means a filter function changed. The engine uses `butter`, `sosfilt` and nothing else at runtime.
 - A `jukebox` failure with a Qt message usually means PyQt6 moved an enum. The fix is the new name, one line.
+
+### Story checks against inkjs
+
+`node android/test/storytest.js` plays the Android port of the story code on the latest inkjs. If it fails and the Python story checks pass, either inkjs changed or `android/www/js/story.js` fell behind `calder_falls/story.py`. Compare the two; they go function by function in the same order. The port uses `Story`, `canContinue`, `Continue`, `currentTags`, `currentChoices`, `ChooseChoiceIndex`, `variablesState`, `state.toJson` and `state.LoadJson` from inkjs.
 
 ### Latest inklecate
 
@@ -67,7 +71,28 @@ bink is a small project with one main maintainer. If a new release breaks the st
 
 ### AppImage selftest
 
-`PortAudio failed to load` means `calder_falls/_libs.py` isn't finding the bundled `libportaudio.so.2`. Extract the AppImage (`./Calder-Falls-x86_64.AppImage --appimage-extract`) and check that `squashfs-root/usr/lib/calder-falls/_internal/` still holds `libportaudio.so*` and `libfluidsynth.so*` (for the jukebox, `usr/lib/calder-falls-jukebox/`). PyInstaller has moved that folder once before.
+`PortAudio failed to load` means `calder_falls/_libs.py` isn't finding the bundled `libportaudio.so.2`. Extract the AppImage (`./Calder-Falls-x86_64.AppImage --appimage-extract`) and check that `squashfs-root/usr/lib/calder-falls/_internal/` still holds `libportaudio.so*` and `libfluidsynth.so*`. PyInstaller has moved that folder once before.
+
+### Windows build
+
+- "Latest FluidSynth for Windows" failing with no matching assets: FluidSynth renamed its release zips. Look at the latest release on github.com/FluidSynth/fluidsynth, find the 64-bit Windows zip, and change the `--pattern` in `release.yml` to match it. The build log prints which zip and which DLLs it used.
+- The selftest failing with `Couldn't find the FluidSynth library` or a DLL load error: FluidSynth renamed its DLL again (`libfluidsynth-3.dll` became `fluidsynth-3.dll` in 2.4.5). Add the new name to the Windows patterns in `calder_falls/_libs.py` and to `fluidsynth_dir()` in `build/build-exe.py`.
+- "no selftest log was written": the EXE didn't get far enough to open the log, usually a missing DLL. Unzip the artifact on a Windows machine and run `Calder Falls.exe` from a terminal, or use Dependencies (github.com/lucasg/Dependencies) on `_internal\fluidsynth-3.dll` to see what it can't find.
+- Inno Setup: the step installs it with Chocolatey if the runner image doesn't have it. If the installer step fails on a script error, Inno Setup changed something; its compiler message names the line in `build/windows/calder-falls.iss`. Never change the `AppId` line, since that's how Windows matches upgrades to the installed copy.
+
+### Android build
+
+Each step in the Android job, and what its failure usually means:
+
+- "Assemble the web content": `calder_falls.audio.variants` failed (the same engine as the music checks, so the smoke test usually fails first), or npm couldn't install inkjs, or inkjs moved its browser build out of `dist/ink.js`. The script says which.
+- "Front end checks in Chromium": `android/test/webtest.py` plays the front end at phone and tablet sizes. A failure names the check, and JavaScript errors print in full. Run it locally after `bash android/build-web.sh --music /some/folder/with/renders` to skip the five-minute render.
+- "Build the signed APK": the newest Android Gradle Plugin and the current Gradle didn't agree, or the plugin changed its build DSL. The error names the line in `android/app/build.gradle.kts`. A brand-new major plugin version is the usual cause; if the fix isn't obvious, check the plugin's release notes for removed properties.
+- "Check the signature": a secret is missing or wrong. See "Signing the Android app" in the README.
+
+Two things in the Android build are fixed numbers on purpose:
+
+- `compileSdk` and `targetSdk` (37, Android 17) in `android/app/build.gradle.kts`. Once a year, after a new Android release, raise both, run the workflow, and play the APK on a phone. A new target can change how Android treats the app (edge-to-edge drawing, the back gesture), which a green build won't show. Google Play isn't involved, so there's no deadline, but don't let it fall years behind.
+- `minSdk` 26 (Android 8). No reason to change it.
 
 `music plays during the Prologue` failing in the game selftest means the engine came up but rendered silence. Run the music checks on their own (`python3 -m calder_falls.audio.smoke`) to see which part.
 
@@ -90,8 +115,12 @@ If any cue changed since the last check:
 
 ## 6. GitHub Actions versions
 
-`release.yml` uses `actions/checkout@v5`, `actions/setup-python@v6` and `actions/upload-artifact@v4`. GitHub warns in the run log when a major version is being retired. If you see that warning, bump the number to whatever the action's README says is current.
+`release.yml` uses `actions/checkout@v5`, `actions/setup-python@v6`, `actions/upload-artifact@v4`, `actions/download-artifact@v4`, `gradle/actions/setup-gradle@v4` and `actions/attest-build-provenance@v2`. GitHub warns in the run log when a major version is being retired. If you see that warning, bump the number to whatever the action's README says is current. Bump upload-artifact and download-artifact together.
 
-## 7. Write it down
+## 7. The Android keystore
+
+Check you still have `calder-release.jks` and its password somewhere that isn't this computer. Nothing breaks without it until the day you need it, and then there is no fix.
+
+## 8. Write it down
 
 Add an entry to `changes.md` for anything you changed, even a one-line fix, so the next check knows what moved.

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Calder Falls</title>
+<link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- title screen -->
+  <section id="title" class="screen">
+    <div class="tower-wrap">
+      <img id="tower" src="img/calder-falls.svg" alt="">
+      <div id="tower-light"></div>
+    </div>
+    <div class="title-col">
+      <h1 class="bigtitle">CALDER FALLS</h1>
+      <div id="subtitle" class="subtitle"></div>
+      <div class="title-buttons">
+        <button data-act="new">New game</button>
+        <button data-act="continue">Continue</button>
+        <button data-act="load">Load</button>
+        <button data-act="settings">Settings</button>
+        <button data-act="howto">How to Play</button>
+      </div>
+      <div id="loading" class="small"></div>
+    </div>
+  </section>
+
+  <!-- the game -->
+  <section id="game" class="screen hidden">
+    <header id="topstrip">
+      <div class="top-left">
+        <div id="chapter"></div>
+        <div id="items" class="small"></div>
+      </div>
+      <canvas id="watch" class="watch"></canvas>
+      <canvas id="nerve" class="nerve" title="Nerve. It drops in bad moments and comes back when you rest or smoke."></canvas>
+      <button id="hint-btn" class="menu">Hint</button>
+      <button id="menu-btn" class="menu">Menu</button>
+    </header>
+
+    <div id="body">
+      <div id="left" class="pane active" data-pane="story">
+        <div id="story-wrap">
+          <div id="story"><div id="story-inner"></div></div>
+          <div id="dark"></div>
+        </div>
+        <div id="choices">
+          <div id="timerbar" class="hidden"><div></div></div>
+          <div id="choice-grid"></div>
+        </div>
+      </div>
+
+      <aside id="side">
+        <nav id="tabs">
+          <button data-tab="story" class="story-tab">Story</button>
+          <button data-tab="notebook">Notebook</button>
+          <button data-tab="evidence">Evidence</button>
+          <button data-tab="map">Map</button>
+          <button data-tab="radio">Radio</button>
+        </nav>
+        <div class="pane" data-pane="notebook">
+          <canvas id="notebook-page"></canvas>
+          <div class="pager">
+            <button id="nb-prev" class="flat">Back</button>
+            <span id="nb-label" class="small"></span>
+            <button id="nb-next" class="flat">Next</button>
+          </div>
+        </div>
+        <div class="pane" data-pane="evidence">
+          <div id="cork"></div>
+          <div id="ev-detail" class="small">Tap a photo or a statement to read it.</div>
+        </div>
+        <div class="pane" data-pane="map">
+          <canvas id="map"></canvas>
+        </div>
+        <div class="pane" data-pane="radio">
+          <canvas id="dial"></canvas>
+          <div id="freq" class="small"></div>
+          <button id="am-btn" class="flat" disabled>Listen</button>
+          <div class="police">
+            <canvas id="knob" width="70" height="70"></canvas>
+            <div>
+              <div>Police band</div>
+              <div id="police-label" class="small">Nothing on the band.</div>
+            </div>
+          </div>
+          <div class="small radio-note">Drag the needle to tune. Tap the knob to key the police band.</div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <canvas id="overlay"></canvas>
+
+  <!-- the fake crash -->
+  <div id="crash" class="hidden">
+    <pre id="crash-text"></pre>
+    <button id="crash-restart">Restart</button>
+  </div>
+
+  <!-- dialogs are built in js/app.js into this layer -->
+  <div id="dialogs"></div>
+</div>
+
+<script src="js/ink.js"></script>
+<script src="js/story.js"></script>
+<script src="js/musictags.js"></script>
+<script src="js/music.js"></script>
+<script src="js/themes.js"></script>
+<script src="js/overlay.js"></script>
+<script src="js/widgets.js"></script>
+<script src="js/storyview.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

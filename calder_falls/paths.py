@@ -1,11 +1,13 @@
 """Where things live.
 
 data_dir() is the folder holding music/, soundfonts/ and fonts/. From a
-source checkout that is the repo root. Inside the AppImage it is the
-PyInstaller bundle. CALDER_DATA overrides both.
+source checkout that is the repo root. Inside the AppImage or the Windows
+build it is the PyInstaller bundle. CALDER_DATA overrides both.
 
-user_dir() is ~/.local/share/calder-falls (or $XDG_DATA_HOME/calder-falls),
-where saves and downloaded sound banks go.
+user_dir() is where saves and downloaded sound banks go:
+~/.local/share/calder-falls on Linux, %APPDATA%\\calder-falls on Windows.
+$XDG_DATA_HOME/calder-falls wins on either, which is how the selftests
+keep their files out of your real ones.
 """
 
 import os
@@ -22,7 +24,11 @@ def data_dir():
 
 
 def user_dir():
-    base = os.environ.get("XDG_DATA_HOME") or os.path.join(os.path.expanduser("~"), ".local", "share")
+    base = os.environ.get("XDG_DATA_HOME")
+    if not base and sys.platform == "win32":
+        base = os.environ.get("APPDATA")
+    if not base:
+        base = os.path.join(os.path.expanduser("~"), ".local", "share")
     return os.path.join(base, "calder-falls")
 
 

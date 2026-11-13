@@ -11,7 +11,7 @@
 # 5. The game window opens with no display, plays the Prologue with sound,
 #    and toggles every setting. The jukebox does the same for its controls.
 # 6. Any AppImage paths given run their own selftest too:
-#      bash build/smoke-test.sh dist/Calder-Falls-x86_64.AppImage dist/Calder-Falls-Jukebox-x86_64.AppImage
+#      bash build/smoke-test.sh dist/Calder-Falls-x86_64.AppImage
 #
 # Every stage runs even if an earlier one failed. If anything failed, the very
 # end of the output names each failed stage and repeats its FAIL and error

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Midnight from the first frame, so the screen never flashes white
+         while the WebView starts. -->
+    <style name="Midnight" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/midnight</item>
+        <item name="android:colorBackground">@color/midnight</item>
+        <item name="android:statusBarColor">@color/midnight</item>
+        <item name="android:navigationBarColor">@color/midnight</item>
+    </style>
+    <color name="midnight">#0B0F1A</color>
+</resources>
