@@ -1,19 +1,26 @@
 name: Build and release
 
-# Tag push (v0.2.0, v0.3.0, ...) builds the game and jukebox AppImages and
-# attaches them to that tag's release. "Run workflow" on the Actions tab
-# builds them too and keeps them as downloadable artifacts, without a release.
+# Pushes to main and pull requests only run the checks.
+#
+# Releasing: create the release and its tag (like v0.3.0) on the Releases
+# page first. Then Actions > "Build and release" > Run workflow, and pick that
+# tag under "Use workflow from". The run builds the Linux AppImage, the
+# Windows zip and installer, and the Android APK from that tag and attaches
+# them to that release. Run it on a branch and you still get the builds as
+# artifacts, but the release step fails and says why.
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build:
+  checks:
+    name: Checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -33,7 +40,7 @@ jobs:
       - name: Python packages (latest versions, no pins)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
+          pip install -r requirements.txt
 
       - name: Latest inklecate
         run: |
@@ -48,35 +55,268 @@ jobs:
       - name: Smoke test
         run: bash build/smoke-test.sh
 
-      - name: Build AppImages
-        run: bash build/build-appimage.sh both
+      # The Android front end runs the same story on inkjs instead of bink
+      - name: Story checks against inkjs
+        run: |
+          work=$(mktemp -d)
+          (cd "$work" && npm init -y >/dev/null && npm install --no-audit --no-fund --silent inkjs)
+          node android/test/storytest.js "$work/node_modules/inkjs/dist/ink.js"
 
-      - name: AppImage selftests
+      # Every build below uses this exact compiled story
+      - name: Keep the compiled story
+        uses: actions/upload-artifact@v4
+        with:
+          name: story
+          path: story/build/main.json
+          if-no-files-found: error
+
+  appimage:
+    name: Linux AppImage
+    needs: checks
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: story
+          path: story/build
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+          check-latest: true
+
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libfluidsynth3 libportaudio2 fluidr3mono-gm-soundfont \
+            libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+
+      - name: Python packages (latest versions, no pins)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build the AppImage
+        run: bash build/build-appimage.sh
+
+      - name: AppImage selftest
         env:
           APPIMAGE_EXTRACT_AND_RUN: "1"
           QT_QPA_PLATFORM: offscreen
           LC_ALL: C.UTF-8
           XDG_DATA_HOME: ${{ runner.temp }}/xdg
         run: |
-          chmod +x dist/*.AppImage
+          chmod +x dist/Calder-Falls-x86_64.AppImage
           dist/Calder-Falls-x86_64.AppImage --selftest
-          dist/Calder-Falls-Jukebox-x86_64.AppImage --selftest
 
-      - name: Keep as artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: Calder-Falls-AppImages
-          path: dist/*.AppImage
+          name: Calder-Falls-linux
+          path: dist/Calder-Falls-x86_64.AppImage
+          if-no-files-found: error
 
-      - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/')
+  windows:
+    name: Windows zip and installer
+    needs: checks
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: story
+          path: story/build
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+          check-latest: true
+
+      - name: Python packages (latest versions, no pins)
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller pillow
+
+      # FluidSynth has no pip package with the library in it. Its GitHub
+      # releases have Windows builds; take the latest 64-bit ones.
+      - name: Latest FluidSynth for Windows
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${GITHUB_REF_NAME}"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" dist/*.AppImage --clobber
-          else
-            gh release create "$tag" dist/*.AppImage \
-              --title "Calder Falls $tag" --notes "See changes.md for what changed."
+          mkdir -p "$RUNNER_TEMP/fluidsynth"
+          gh release download --repo FluidSynth/fluidsynth --pattern '*win10-x64*.zip' \
+            --dir "$RUNNER_TEMP/fluidsynth"
+          ls -l "$RUNNER_TEMP/fluidsynth"
+
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc) -and -not (Get-Command iscc -ErrorAction SilentlyContinue)) {
+            choco install innosetup -y --no-progress
+          }
+
+      - name: Build
+        shell: bash
+        run: python build/build-exe.py --fluidsynth "$RUNNER_TEMP/fluidsynth" --installer
+
+      # The EXE is a windowed program with no console, so its selftest
+      # output goes to the file named in CALDER_LOG.
+      - name: Selftest
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          XDG_DATA_HOME: ${{ runner.temp }}\xdg
+          CALDER_LOG: ${{ runner.temp }}\selftest.log
+        run: |
+          $p = Start-Process -FilePath "dist\Calder-Falls\Calder Falls.exe" -ArgumentList "--selftest" -Wait -PassThru
+          if (Test-Path $env:CALDER_LOG) { Get-Content $env:CALDER_LOG } else { Write-Output "no selftest log was written" }
+          exit $p.ExitCode
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Calder-Falls-windows
+          path: |
+            dist/Calder-Falls-windows-x64.zip
+            dist/Calder-Falls-Setup-x64.exe
+          if-no-files-found: error
+
+  android:
+    name: Android APK
+    needs: checks
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: story
+          path: story/build
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+          check-latest: true
+
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libfluidsynth3 libportaudio2
+
+      - name: Python packages (latest versions, no pins)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt playwright
+          python -m playwright install --with-deps chromium
+
+      # Renders every music state the story reaches through FluidSynth, since
+      # the phone has no synth. About five minutes.
+      - name: Assemble the web content
+        run: bash android/build-web.sh
+
+      - name: Front end checks in Chromium
+        run: python android/test/webtest.py
+
+      - name: Gradle (current release)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: current
+
+      - name: Load the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::The ANDROID_KEYSTORE_BASE64 secret is missing. See 'Signing the Android app' in the README."
+            exit 1
           fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/calder-release.jks"
+          echo "CF_KEYSTORE=$RUNNER_TEMP/calder-release.jks" >> "$GITHUB_ENV"
+
+      - name: Build the signed APK
+        env:
+          CF_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          CF_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          CF_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: bash android/build-android.sh
+
+      - name: Check the signature
+        run: |
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          if [ ! -f "$apk" ]; then
+            echo "::error::No signed APK at $apk. Check the signing secrets."
+            exit 1
+          fi
+          apksigner=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
+          "$apksigner" verify --verbose --print-certs "$apk"
+          mkdir -p dist
+          cp "$apk" dist/Calder-Falls-android.apk
+
+      - name: Remove the key from the runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/calder-release.jks"
+
+      - name: Build provenance attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/Calder-Falls-android.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Calder-Falls-android
+          path: dist/Calder-Falls-android.apk
+          if-no-files-found: error
+
+  # Runs straight away, so a run on a branch or a tag with no release says so
+  # at the top of the run instead of after half an hour of building.
+  release-check:
+    name: Release target
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tag and release exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            echo "::error::This run is on the branch '$GITHUB_REF_NAME', not a tag. The builds are kept as artifacts, but nothing gets released. To release: create the release and its tag on the Releases page, then Run workflow and pick that tag under 'Use workflow from'."
+            exit 1
+          fi
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::There is no release for the tag '$GITHUB_REF_NAME'. Create it on the Releases page first (Draft a new release, pick this tag, publish), then run this again."
+            exit 1
+          fi
+          echo "Releasing to $GITHUB_REF_NAME"
+
+  release:
+    name: Attach to the release
+    needs: [release-check, appimage, windows, android]
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Calder-Falls-*
+          path: out
+          merge-multiple: true
+
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -l out
+          gh release upload "$GITHUB_REF_NAME" out/* --clobber --repo "$GITHUB_REPOSITORY"
